@@ -1,0 +1,38 @@
+{
+	"db": "./music.db",
+	
+	"dirs": {
+		"music": "./music"
+	},
+	
+	"allowed_exts": ["mp3", "ogg", "opus", "m4a", "aac", "flac", "wma"],
+	
+	"restapi": "http://10.161.8.254:7979/rest",
+
+	"audio": {
+		"bitrate": "80",
+		"rate": "48000",
+		"codec": "libopus",
+		"container": "ogg",
+		"options": [
+			"-vn",
+			"-compression_level 10",
+			"-frame_duration 60"
+		],
+		"mimetype": "application/ogg"
+	},
+
+	"art": {
+		"size": "800",
+		"files": [
+			"cover.jpg",
+			"cover.png",
+			"folder.jpg",
+			"folder.png"
+		]
+	},
+
+	"login": {
+		"test": "abc123"
+	}
+}
