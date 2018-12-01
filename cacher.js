@@ -12,7 +12,7 @@ var db = new sqlite3.Database(settings.db);
 
 db.serialize(function() {
 	db.run("DROP TABLE IF EXISTS music_fts");
-	db.run("CREATE VIRTUAL TABLE music_fts USING fts5(title, artist, album, genre, duration, bitrate, path, mtime, title_hash, artist_hash, album_hash, path_hash);");
+	db.run("CREATE VIRTUAL TABLE music_fts USING fts5(title, artist, album, genre, duration, bitrate, path, mtime, artist_hash, album_hash, path_hash);");
 });
 
 function readThroughDir(path) {
@@ -73,14 +73,13 @@ function modDatabase(path, metadata) {
 	];
 
 	values = values.concat([
-		"3" + crypto.createHash("sha224").update(values[0]).digest("hex"),
+		"3" + crypto.createHash("sha224").update(values[6]).digest("hex"),
 		"1" + crypto.createHash("sha224").update(values[1]).digest("hex"),
-		"2" + crypto.createHash("sha224").update(values[2]).digest("hex"),
-		"4" + crypto.createHash("sha224").update(values[6]).digest("hex")
+		"2" + crypto.createHash("sha224").update(values[2]).digest("hex")
 	]);
 
 	db.serialize(function() {
-		db.run("INSERT INTO music_fts (title, artist, album, genre, duration, bitrate, path, mtime, title_hash, artist_hash, album_hash, path_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values);
+		db.run("INSERT INTO music_fts (title, artist, album, genre, duration, bitrate, path, mtime, path_hash, artist_hash, album_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values);
 	});
 }
 

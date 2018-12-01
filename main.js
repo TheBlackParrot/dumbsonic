@@ -246,7 +246,7 @@ funcs = {
 
 			case "2":
 				where = "album_hash";
-				search = "title_hash";
+				search = "path_hash";
 				wants = "album";
 				children_wants = "title";
 				break;
@@ -299,7 +299,7 @@ funcs = {
 
 					case "2":
 						attrs = {
-							id: row["title_hash"],
+							id: row["path_hash"],
 							parent: row["album_hash"],
 							title: row["title"],
 							isDir: false,
@@ -383,7 +383,7 @@ funcs = {
 		console.log(query.id);
 
 		db.serialize(function() {
-			db.get(`SELECT path FROM music_fts WHERE title_hash MATCH ?`, "\"" + query.id + "\"", function(err, row) {
+			db.get(`SELECT path FROM music_fts WHERE path_hash MATCH ?`, "\"" + query.id + "\"", function(err, row) {
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 				console.log(path);
 
@@ -498,7 +498,7 @@ funcs = {
 					"entry": [
 						{
 							"_attr": {
-								"id": row.title_hash,
+								"id": row.path_hash,
 								"parent": row.album_hash,
 								"title": row.title,
 								"album": row.album,
@@ -544,7 +544,7 @@ funcs = {
 				break;
 
 			case "3":
-				which = "title_hash";
+				which = "path_hash";
 				break;
 
 			default:
@@ -601,7 +601,7 @@ funcs = {
 					"song": [
 						{
 							"_attr": {
-								"id": row.title_hash,
+								"id": row.path_hash,
 								"parent": row.album_hash,
 								"title": row.title,
 								"album": row.album,
