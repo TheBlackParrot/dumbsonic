@@ -565,6 +565,11 @@ funcs = {
 
 		db.serialize(function() {
 			db.get(`SELECT * FROM music_fts WHERE ${which} MATCH ?`, "\"" + query.id + "\"", function(err, row) {
+				if(typeof row === "undefined") {
+					funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
+					return;
+				}
+				
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 				let folder = path.substr(0, path.lastIndexOf("/"));
 
@@ -779,6 +784,9 @@ for(idx in nullify) {
 for(page in funcs) {
 	funcs[`${page}.view`] = funcs[page];
 	funcs[`/rest${page}.view`] = funcs[page];
+
+	nullify.push(`${page}.view`);
+	nullify.push(`/rest${page}.view`);
 }
 //console.log(Object.keys(funcs));
 
@@ -794,7 +802,24 @@ http.createServer(function(req, res) {
 	//console.log("\n\n");
 	//console.log(path, query);
 
-	console.log(req.url);
+	if(!(path in funcs)) {
+		res.writeHead(404);
+		res.end();
+		return;
+	}
+
+	if(!(path in nullify)) {
+		let safeQuery = Object.assign({}, query);
+		if("p" in safeQuery) { delete safeQuery["p"]; }
+		if("t" in safeQuery) { delete safeQuery["t"]; }
+		if("s" in safeQuery) { delete safeQuery["s"]; }
+		console.log({
+			ip: req.connection.remoteAddress,
+			time: Math.floor(Date.now() / 1000),
+			func: path,
+			query: safeQuery
+		});
+	}
 
 	let callback = endReq;
 
