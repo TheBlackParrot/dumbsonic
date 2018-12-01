@@ -248,7 +248,7 @@ funcs = {
 				where = "album_hash";
 				search = "path_hash";
 				wants = "album";
-				children_wants = "title";
+				children_wants = "path";
 				break;
 
 			default:

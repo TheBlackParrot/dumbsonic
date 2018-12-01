@@ -65,7 +65,7 @@ function modDatabase(path, metadata) {
 		(metadata.common.title || path.substr(path.lastIndexOf("/") + 1)),
 		(metadata.common.artist || "Unknown Artist"),
 		(metadata.common.album || "Unknown Album"),
-		(metadata.common.genre === undefined ? "" : metadata.common.genre.join(", ")),
+		(metadata.common.genre === undefined ? " " : metadata.common.genre.join(", ")),
 		Math.ceil(metadata.format.duration),
 		Math.floor(metadata.format.bitrate/1000),
 		path.replace(settings.dirs.music, ""),
