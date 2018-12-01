@@ -24,14 +24,26 @@ function tryAlbumArt(folder, res, at) {
 	
 	fs.access(cover, fs.constants.R_OK, function(err) {
 		if(!err) {
-			let sharpImg = sharp(cover);
-			sharpImg.on("info", function(info) {
-				console.log(info);
-				if(info.height > settings.art.size || info.width > settings.art.size) {
-					sharpImg.resize(settings.art.size)
-				}
+			sharp(cover).resize(settings.art.size).jpeg({quality: 95}).toBuffer(function(err, data, info) {
+				res.writeHead(200, {"Content-type": "image/jpeg"});
+				res.write(data);
 
-				sharpImg.jpeg({quality: 95}).toBuffer(function(err, data, info) {
+				if(typeof callback == "function") {
+					callback(res);
+				} else {
+					res.end();
+				}
+			});
+		} else {
+			if(at >= settings.art.files.length - 1) {
+				sharp({
+					create: {
+						width: 100,
+						height: 100,
+						channels: 3,
+						background: {r: 64, g: 64, b: 64}
+					}
+				}).jpeg({quality: 95}).toBuffer(function(err, data, info) {
 					res.writeHead(200, {"Content-type": "image/jpeg"});
 					res.write(data);
 
@@ -41,17 +53,6 @@ function tryAlbumArt(folder, res, at) {
 						res.end();
 					}
 				});
-			});
-		} else {
-			if(at >= settings.art.files.length - 1) {
-				res.writeHead(404, {"Content-type": "text/plain"});
-				res.write("Can't access file");
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}
 			} else {
 				tryAlbumArt(folder, res, (at + 1))
 			}
@@ -607,7 +608,7 @@ funcs = {
 		})
 	},
 
-	"error": function(req, res, callback) {
+	"error": function(req, res, err, callback) {
 		obj = {
 			"subsonic-response": [
 				{

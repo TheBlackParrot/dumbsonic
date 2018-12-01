@@ -23,7 +23,7 @@
 	},
 
 	"art": {
-		"size": "800",
+		"size": 800,
 		"files": [
 			"cover.jpg",
 			"cover.png",
