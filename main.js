@@ -569,7 +569,7 @@ funcs = {
 					funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
 					return;
 				}
-				
+
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 				let folder = path.substr(0, path.lastIndexOf("/"));
 
@@ -865,4 +865,4 @@ http.createServer(function(req, res) {
 			}
 		}
 	}
-}).listen(7979);
+}).listen(settings.addr.port, settings.addr.ip);

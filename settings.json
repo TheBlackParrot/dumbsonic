@@ -1,5 +1,10 @@
 {
 	"db": "./music.db",
+
+	"addr": {
+		"ip": "127.0.0.1",
+		"port": 7979
+	},
 	
 	"dirs": {
 		"music": "./music"
