@@ -608,6 +608,74 @@ funcs = {
 		})
 	},
 
+	"/getRandomSongs": function(req, res, callback) {
+		let obj = {
+			"subsonic-response": [
+				{
+					"_attr": {
+						"xmlns": settings.restapi,
+						"status": "ok",
+						"version": "1.16.1"
+					}
+				},
+
+				{
+					"randomSongs": [
+					]
+				}
+			]
+		};
+
+		let parsed = url.parse(req.url, true)
+		let query = parsed.query;
+
+		if("size" in query) {
+			size = parseInt(query.size.replace(/[^0-9]/gi, "") || 10);
+		} else {
+			size = 10;
+		}
+
+		db.serialize(function() {
+			let list = obj["subsonic-response"][1]["randomSongs"];
+
+			db.each(`SELECT * FROM music_fts ORDER BY RANDOM() LIMIT ?`, size, function(err, row) {
+				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
+
+				list.push({
+					"song": [
+						{
+							"_attr": {
+								"id": row.title_hash,
+								"parent": row.album_hash,
+								"title": row.title,
+								"album": row.album,
+								"artist": row.artist,
+								"isDir": false,
+								"duration": row.duration,
+								"bitRate": row.bitrate,
+								"isVideo": false,
+								"path": path,
+								"albumId": row.album_hash,
+								"artistId": row.artist_hash,
+								"type": "music",
+								"coverArt": row.album_hash
+							}
+						}
+					]
+				})
+			}, function() {
+				res.writeHead(200, {"Content-type": "text/xml"});
+				res.write(xml(obj));
+
+				if(typeof callback == "function") {
+					callback(res);
+				} else {
+					res.end();
+				}				
+			});
+		})		
+	},
+
 	"error": function(req, res, err, callback) {
 		obj = {
 			"subsonic-response": [
