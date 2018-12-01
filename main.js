@@ -558,8 +558,7 @@ funcs = {
 				break;
 
 			default:
-				res.writeHead(403, {"Content-type": "text/plain"});
-				res.write("Unimplemented");
+				funcs["error"](req, res, {code: 0, msg: "Unimplemented."});
 				return;
 				break;
 		}

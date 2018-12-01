@@ -32,9 +32,9 @@ function readThroughDir(path) {
 
 				for(let x in files) {
 					let r = files[x];
-					console.log(`${path}\\${r}`);
+					console.log(`${path}/${r}`);
 
-					readThroughDir(`${path}\\${r}`);
+					readThroughDir(`${path}/${r}`);
 				}				
 			});
 		} else {
@@ -91,8 +91,8 @@ fs.readdir(settings.dirs.music, function(err, files) {
 
 	for(let x in files) {
 		let path = files[x];
-		console.log(`${settings.dirs.music}\\${path}`);
+		console.log(`${settings.dirs.music}/${path}`);
 
-		readThroughDir(`${settings.dirs.music}\\${path}`);
+		readThroughDir(`${settings.dirs.music}/${path}`);
 	}
 })
