@@ -384,6 +384,11 @@ funcs = {
 
 		db.serialize(function() {
 			db.get(`SELECT path FROM music_fts WHERE path_hash MATCH ?`, "\"" + query.id + "\"", function(err, row) {
+				if(typeof row === "undefined") {
+					funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
+					return;
+				}
+
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 				console.log(path);
 
@@ -485,6 +490,11 @@ funcs = {
 		switch(query.id) {
 			case "1":
 				sql = `SELECT * FROM music_fts`;
+				break;
+
+			default:
+				funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
+				return;				
 				break;
 		}
 
