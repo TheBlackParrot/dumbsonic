@@ -20,7 +20,7 @@ var db = new sqlite3.Database(settings.db);
 
 function tryAlbumArt(folder, res, at) {
 	let cover = `${folder}/${settings.art.files[at]}`;
-	console.log(`trying ${cover}`);
+	//console.log(`trying ${cover}`);
 	
 	fs.access(cover, fs.constants.R_OK, function(err) {
 		if(!err) {
@@ -202,7 +202,7 @@ funcs = {
 		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		console.log(query.id);
+		//console.log(query.id);
 
 		let obj = {
 			"subsonic-response": [
@@ -328,9 +328,9 @@ funcs = {
 					]
 				});
 			}, function() {
-				console.log(children);
-				console.log(mainPart);
-				console.log(obj);
+				//console.log(children);
+				//console.log(mainPart);
+				//console.log(obj);
 
 				res.writeHead(200, {"Content-type": "text/xml"});
 				res.write(xml(obj));
@@ -380,7 +380,7 @@ funcs = {
 		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		console.log(query.id);
+		//console.log(query.id);
 
 		db.serialize(function() {
 			db.get(`SELECT path FROM music_fts WHERE path_hash MATCH ?`, "\"" + query.id + "\"", function(err, row) {
@@ -390,7 +390,7 @@ funcs = {
 				}
 
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
-				console.log(path);
+				//console.log(path);
 
 				let ffCmd = new ffmpeg(path)
 					.audioCodec(settings.audio.codec)
@@ -399,7 +399,7 @@ funcs = {
 					.outputOptions(settings.audio.options)
 					.format(settings.audio.container)
 					.on('end', function() {
-						console.log(`finished transcoding ${path}`);
+						//console.log(`finished transcoding ${path}`);
 						if(typeof callback == "function") {
 							callback(res);
 						} else {
@@ -484,7 +484,7 @@ funcs = {
 		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		console.log(query.id);
+		//console.log(query.id);
 
 		let sql = "";
 		switch(query.id) {
@@ -545,7 +545,7 @@ funcs = {
 		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		console.log(query.id);
+		//console.log(query.id);
 
 		let which = "";
 		switch(query.id[0]) {
@@ -780,7 +780,7 @@ for(page in funcs) {
 	funcs[`${page}.view`] = funcs[page];
 	funcs[`/rest${page}.view`] = funcs[page];
 }
-console.log(Object.keys(funcs));
+//console.log(Object.keys(funcs));
 
 var endReq = function(res) {
 	res.end();
@@ -791,29 +791,31 @@ http.createServer(function(req, res) {
 	let parsed = url.parse(req.url, true)
 	let query = parsed.query;
 	let path = parsed.pathname;
-	console.log("\n\n");
-	console.log(path, query);
+	//console.log("\n\n");
+	//console.log(path, query);
+
+	console.log(req.url);
 
 	let callback = endReq;
 
 	if(!(query.u in settings.login)) {
-		console.log("invalid username");
+		//console.log("invalid username");
 
 		funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
 		return;
 	} else {
-		console.log("valid username");
+		//console.log("valid username");
 
 		if("p" in query) {
 			let hex = Buffer.from(settings.login[query.u], 'utf8').toString('hex');
 
 			if(query.p != "enc:" + hex) {
-				console.log("invalid password");
+				//console.log("invalid password");
 
 				funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
 				return;
 			} else {
-				console.log(`valid password, trying ${path}`);
+				//console.log(`valid password, trying ${path}`);
 
 				if(path in funcs) {
 					funcs[path](req, res, callback);
@@ -824,14 +826,14 @@ http.createServer(function(req, res) {
 			let correctHash = crypto.createHash("md5").update(settings.login[query.u] + query.s).digest("hex");
 
 			if(query.t == correctHash) {
-				console.log(`valid token, trying ${path}`);
+				//console.log(`valid token, trying ${path}`);
 
 				if(path in funcs) {
 					funcs[path](req, res, callback);
 					return;
 				}				
 			} else {
-				console.log("invalid token");
+				//console.log("invalid token");
 
 				funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
 				return;
