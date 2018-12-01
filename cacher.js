@@ -12,7 +12,7 @@ var db = new sqlite3.Database(settings.db);
 
 db.serialize(function() {
 	db.run("DROP TABLE IF EXISTS music_fts");
-	db.run("CREATE VIRTUAL TABLE music_fts USING fts5(title, artist, album, genre, duration, bitrate, path, title_hash, artist_hash, album_hash, path_hash);");
+	db.run("CREATE VIRTUAL TABLE music_fts USING fts5(title, artist, album, genre, duration, bitrate, path, mtime, title_hash, artist_hash, album_hash, path_hash);");
 });
 
 function readThroughDir(path) {
@@ -48,9 +48,12 @@ function parseForDatabase(path) {
 		return;
 	}
 
-	mm.parseFile(path, {native: true})
+	mm.parseFile(path, {native: false, skipCovers: true})
 		.then(function(metadata) {
-			modDatabase(path, metadata);
+			fs.stat(path, function(err, stats) {
+				metadata.common["mtime"] = Math.floor(stats.mtimeMs/1000)
+				modDatabase(path, metadata);
+			});
 		})
 		.catch(function(err) {
 			console.log(err);
@@ -65,19 +68,19 @@ function modDatabase(path, metadata) {
 		(metadata.common.genre === undefined ? "" : metadata.common.genre.join(", ")),
 		Math.ceil(metadata.format.duration),
 		Math.floor(metadata.format.bitrate/1000),
-		path.replace(settings.dirs.music, "")
+		path.replace(settings.dirs.music, ""),
+		metadata.common.mtime
 	];
 
-	let values_ex = values.concat([
+	values = values.concat([
 		"3" + crypto.createHash("sha224").update(values[0]).digest("hex"),
 		"1" + crypto.createHash("sha224").update(values[1]).digest("hex"),
 		"2" + crypto.createHash("sha224").update(values[2]).digest("hex"),
 		"4" + crypto.createHash("sha224").update(values[6]).digest("hex")
 	]);
 
-
 	db.serialize(function() {
-		db.run("INSERT INTO music_fts (title, artist, album, genre, duration, bitrate, path, title_hash, artist_hash, album_hash, path_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values_ex);
+		db.run("INSERT INTO music_fts (title, artist, album, genre, duration, bitrate, path, mtime, title_hash, artist_hash, album_hash, path_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values);
 	});
 }
 

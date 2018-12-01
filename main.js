@@ -119,50 +119,6 @@ funcs = {
 		}
 	},
 
-	"/getMusicFolders": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"musicFolders": [
-					]
-				}
-			]
-		}
-
-		db.serialize(function() {
-			db.each("SELECT DISTINCT artist, artist_hash FROM music_fts", function(err, row) {
-				let folder = {
-					"musicFolder": [
-						{
-							"_attr": {
-								"id": row.hash,
-								"name": row.artist
-							}
-						}
-					]
-				};
-				obj["subsonic-response"][1]["musicFolders"].push(folder)
-			}, function() {
-				res.writeHead(200, {"Content-type": "text/xml"});
-				res.write(xml(obj));
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}
-			});
-		});
-	},
-
 	"/getIndexes": function(req, res, callback) {
 		/* FUCK XML */
 		let obj = {
@@ -676,6 +632,94 @@ funcs = {
 		})		
 	},
 
+	"/getAlbumList": function(req, res, callback) {
+		let obj = {
+			"subsonic-response": [
+				{
+					"_attr": {
+						"xmlns": settings.restapi,
+						"status": "ok",
+						"version": "1.16.1"
+					}
+				},
+
+				{
+					"albumList": [
+					]
+				}
+			]
+		};
+
+		let parsed = url.parse(req.url, true)
+		let query = parsed.query;
+
+		if("size" in query) {
+			size = parseInt(query.size.replace(/[^0-9]/gi, "") || 10);
+		} else {
+			size = 10;
+		}
+
+		if("offset" in query) {
+			offset = parseInt(query.offset.replace(/[^0-9]/gi, "") || 0);
+		} else {
+			offset = 0;
+		}
+
+		let type = "random";
+		if("type" in query) {
+			let allowedTypes = ["random", "newest", "alphabeticalByName"];
+			if(allowedTypes.indexOf(query.type) != -1) {
+				type = query.type;
+			}
+		}
+
+		let sql = ""
+		switch(type) {
+			case "newest":
+				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY mtime DESC LIMIT ? OFFSET ${offset}`;
+				break;
+
+			case "random":
+				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY RANDOM() LIMIT ?`;
+				break;
+
+			case "alphabeticalByName":
+				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY album ASC LIMIT ? OFFSET ${offset}`;
+				break;
+		}
+
+		db.serialize(function() {
+			let list = obj["subsonic-response"][1]["albumList"];
+
+			db.each(sql, size, function(err, row) {
+				list.push({
+					"album": [
+						{
+							"_attr": {
+								"id": row.album_hash,
+								"parent": row.artist_hash,
+								"title": row.album,
+								"album": row.album,
+								"artist": row.artist,
+								"isDir": true,
+								"coverArt": row.album_hash
+							}
+						}
+					]
+				})
+			}, function() {
+				res.writeHead(200, {"Content-type": "text/xml"});
+				res.write(xml(obj));
+
+				if(typeof callback == "function") {
+					callback(res);
+				} else {
+					res.end();
+				}				
+			});
+		})		
+	},
+
 	"error": function(req, res, err, callback) {
 		obj = {
 			"subsonic-response": [
@@ -709,6 +753,18 @@ funcs = {
 			res.end();
 		}
 	}
+}
+
+let nullify = [
+	"/savePlaylistQueue",
+	"/getPlayQueue",
+	"/getBookmarks",
+	"/getGenres",
+	"/getStarred",
+	"/getMusicFolders"
+];
+for(idx in nullify) {
+	funcs[nullify[idx]] = funcs["/ping"];
 }
 
 for(page in funcs) {
