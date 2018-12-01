@@ -61,10 +61,10 @@ function parseForDatabase(path) {
 }
 
 function modDatabase(path, metadata) {
-	values = [
-		metadata.common.title,
-		metadata.common.artist,
-		metadata.common.album,
+	let values = [
+		(metadata.common.title || path.substr(path.lastIndexOf("/") + 1)),
+		(metadata.common.artist || "Unknown Artist"),
+		(metadata.common.album || "Unknown Album"),
 		(metadata.common.genre === undefined ? "" : metadata.common.genre.join(", ")),
 		Math.ceil(metadata.format.duration),
 		Math.floor(metadata.format.bitrate/1000),
@@ -80,6 +80,7 @@ function modDatabase(path, metadata) {
 
 	db.serialize(function() {
 		db.run("INSERT INTO music_fts (title, artist, album, genre, duration, bitrate, path, mtime, path_hash, artist_hash, album_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values);
+		console.log(`added ${path}`);
 	});
 }
 
