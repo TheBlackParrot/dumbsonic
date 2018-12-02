@@ -227,6 +227,32 @@ funcs = {
 		});
 	},
 
+	"/getMusicFolders": function(req, res, callback) {
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			musicFolders: []
+		});
+
+		db.serialize(function() {
+			let musicFolders = obj["subsonic-response"][1]["musicFolders"];
+
+			db.each("SELECT DISTINCT artist_hash, artist FROM music_fts", function(err, row) {
+				musicFolders.push({
+					musicFolder: [
+						{
+							_attr: {
+								id: row.artist_hash,
+								name: row.artist
+							}
+						}
+					]
+				})
+			}, function() {
+				reply(res, req, obj, callback);
+			});
+		})
+	},
+
 	"/getMusicDirectory": function(req, res, callback) {
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
@@ -713,13 +739,13 @@ let nullify = [
 	"/getBookmarks",
 	"/getGenres",
 	"/getStarred",
-	"/getMusicFolders",
 	"/getPodcasts"
 ];
 for(idx in nullify) {
 	funcs[nullify[idx]] = funcs["/ping"];
 }
 
+funcs["/getAlbumList2"] = funcs["/getAlbumList"];
 for(page in funcs) {
 	funcs[`${page}.view`] = funcs[page];
 	funcs[`/rest${page}.view`] = funcs[page];
@@ -739,13 +765,14 @@ http.createServer(function(req, res) {
 	let query = parsed.query;
 	let path = parsed.pathname;
 	//console.log("\n\n");
-	//console.log(path, query);
 
 	if(!(path in funcs)) {
 		res.writeHead(404);
 		res.end();
 		return;
 	}
+
+	console.log(query);
 
 	if(!(path in nullify)) {
 		let safeQuery = Object.assign({}, query);
