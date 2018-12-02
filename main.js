@@ -10,6 +10,8 @@ process.env['FFMPEG_PATH'] = ffmpegStatic.path;
 process.env['FFPROBE_PATH'] = ffmpegStatic.path.replace("ffmpeg", "ffprobe");
 const ffmpeg = require('fluent-ffmpeg');
 const sharp = require("sharp");
+sharp.cache(false);
+sharp.concurrency(1);
 const fs = require("fs");
 
 var db = new sqlite3.Database(settings.db);
@@ -227,7 +229,7 @@ funcs = {
 		});
 	},
 
-	"/getMusicFolders": function(req, res, callback) {
+	/*"/getMusicFolders": function(req, res, callback) {
 		let obj = JSON.parse(JSON.stringify(defaultResponse));
 		obj["subsonic-response"].push({
 			musicFolders: []
@@ -251,7 +253,7 @@ funcs = {
 				reply(res, req, obj, callback);
 			});
 		})
-	},
+	},*/
 
 	"/getMusicDirectory": function(req, res, callback) {
 		let parsed = url.parse(req.url, true)
@@ -739,7 +741,8 @@ let nullify = [
 	"/getBookmarks",
 	"/getGenres",
 	"/getStarred",
-	"/getPodcasts"
+	"/getPodcasts",
+	"/getMusicFolders"
 ];
 for(idx in nullify) {
 	funcs[nullify[idx]] = funcs["/ping"];
