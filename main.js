@@ -18,6 +18,18 @@ var db = new sqlite3.Database(settings.db);
 	SIDENOTE: I do **NOT** condone the use of MD5 being used as a cryptographic hash algorithm. Yell at the Subsonic developers to switch to a more robust hash algorithm.
 */
 
+const defaultResponse = {
+	"subsonic-response": [
+		{
+			_attr: {
+				xmlns: settings.restapi,
+				status: "ok",
+				version: "1.16.1"
+			}
+		}
+	]
+};
+
 function tryAlbumArt(folder, res, at) {
 	let cover = `${folder}/${settings.art.files[at]}`;
 	//console.log(`trying ${cover}`);
@@ -60,83 +72,109 @@ function tryAlbumArt(folder, res, at) {
 	})	
 }
 
+function reply(res, req, obj, callback) {
+	let parsed = url.parse(req.url, true)
+	let query = parsed.query;
+	let path = parsed.pathname;
+
+	let type = "xml";
+	if("f" in query) {
+		if(["xml", "json", "jsonp"].indexOf(query.f) != -1) {
+			type = query.f;
+		}
+	}
+
+	if(type == "json" || type == "jsonp") {
+		// support still WIP, need to get stuff out of _attr objects!
+		let newObj = {"subsonic-response": {}};
+
+		for(let idx in obj["subsonic-response"]) {
+			if(idx == 0) {
+				continue;
+			}
+
+			let part = obj["subsonic-response"][idx];
+			let keys = Object.keys(part);
+
+			for(let idxx in keys) {
+				let key = keys[idxx];
+				newObj["subsonic-response"][key] = part[key];
+
+				/*if(Array.isArray(part[key])) {
+					console.log(`${key} is array`)
+				}*/
+			}
+		}
+
+		newObj["subsonic-response"]["status"] = obj["subsonic-response"][0]._attr.status;
+		newObj["subsonic-response"]["version"] = obj["subsonic-response"][0]._attr.version;
+
+		obj = newObj;
+	}
+
+	let ctype;
+	let data;
+	switch(type) {
+		case "json":
+			ctype = "application/json";
+			data = JSON.stringify(obj);
+			break;
+
+		case "jsonp":
+			ctype = "application/javascript";
+			data = JSON.stringify(obj);
+			if("callback" in query) {
+				data = query.callback + "(" + data + ");";
+				console.log(data);
+			}
+			break;
+
+		default:
+			ctype = "text/xml";
+			data = xml(obj);
+			break;
+	}
+
+	res.writeHead(200, {
+		"Access-Control-Allow-Origin": "*",
+		"Content-type": ctype
+	});
+	res.write(data);
+
+	if(typeof callback == "function") {
+		callback(res);
+	} else {
+		res.end();
+	}	
+}
+
 funcs = {
 	"/ping": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				}
-			]
-		}
-
-		res.writeHead(200, {"Content-type": "text/xml"});
-		res.write(xml(obj));
-
-		if(typeof callback == "function") {
-			callback(res);
-		} else {
-			res.end();
-		}
+		reply(res, req, defaultResponse, callback);
 	},
 
 	"/getLicense": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			license: [
 				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
+					_attr: {
+						valid: true,
+						email: "null@localhost",
+						licenseExpires: "9999-12-31T23:59:59"
 					}
-				},
-
-				{
-					"license": [
-						{
-							"_attr": {
-								"valid": true,
-								"email": "null@localhost",
-								"licenseExpires": "9999-12-31T23:59:59"
-							}
-						}
-					]
 				}
 			]
-		}
+		});
 
-		res.writeHead(200, {"Content-type": "text/xml"});
-		res.write(xml(obj));
-
-		if(typeof callback == "function") {
-			callback(res);
-		} else {
-			res.end();
-		}
+		reply(res, req, obj, callback);
 	},
 
 	"/getIndexes": function(req, res, callback) {
-		/* FUCK XML */
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"indexes": [
-					]
-				}
-			]
-		}
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			indexes: []
+		});
 
 		chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 		indexed = {};
@@ -161,10 +199,10 @@ funcs = {
 				let artists = indexed[char].sort();
 
 				toAdd = {
-					"index": [
+					index: [
 						{
-							"_attr": {
-								"name": char
+							_attr: {
+								name: char
 							}
 						}
 					]
@@ -174,9 +212,9 @@ funcs = {
 					let data = artists[idx];
 
 					toAdd["index"].push({
-						"artist": [
+						artist: [
 							{
-								"_attr": data
+								_attr: data
 							}
 						]
 					});
@@ -185,14 +223,7 @@ funcs = {
 				obj["subsonic-response"][1]["indexes"].push(toAdd)
 			}
 
-			res.writeHead(200, {"Content-type": "text/xml"});
-			res.write(xml(obj));
-
-			if(typeof callback == "function") {
-				callback(res);
-			} else {
-				res.end();
-			}
+			reply(res, req, obj, callback);
 		});
 	},
 
@@ -204,25 +235,14 @@ funcs = {
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
 		//console.log(query.id);
 
-		let obj = {
-			"subsonic-response": [
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			directory: [
 				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"directory": [
-						{
-							"_attr": {}
-						}
-					]
+					_attr: {}
 				}
 			]
-		}
+		});
 
 		let mainPart = obj["subsonic-response"][1]["directory"];
 		let children = [];
@@ -321,9 +341,9 @@ funcs = {
 				}
 
 				mainPart.push({
-					"child": [
+					child: [
 						{
-							"_attr": attrs
+							_attr: attrs
 						}
 					]
 				});
@@ -332,14 +352,7 @@ funcs = {
 				//console.log(mainPart);
 				//console.log(obj);
 
-				res.writeHead(200, {"Content-type": "text/xml"});
-				res.write(xml(obj));
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}
+				reply(res, req, obj, callback);
 			});
 		});
 	},
@@ -417,67 +430,38 @@ funcs = {
 	},
 
 	"/getPlaylists": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			playlists: [
 				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"playlists": [
+					playlist: [
 						{
-							"playlist": [
-								{
-									"_attr": {
-										id: 1,
-										name: "Entire Library",
-										owner: "system",
-										public: true
-									}
-								}
-							]
-						}
-					]
-				}
-			]
-		};
-
-		res.writeHead(200, {"Content-type": "text/xml"});
-		res.write(xml(obj));
-
-		if(typeof callback == "function") {
-			callback(res);
-		} else {
-			res.end();
-		}
-	},
-
-	"/getPlaylist": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"playlist": [
-						{
-							"_attr": {
-								"id": 1
+							_attr: {
+								id: 1,
+								name: "Entire Library",
+								owner: "system",
+								public: true
 							}
 						}
 					]
 				}
 			]
-		};
+		});
+
+		reply(res, req, obj, callback);
+	},
+
+	"/getPlaylist": function(req, res, callback) {
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			playlist: [
+				{
+					_attr: {
+						id: 1
+					}
+				}
+			]
+		});
 
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
@@ -505,36 +489,29 @@ funcs = {
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 
 				playlist.push({
-					"entry": [
+					entry: [
 						{
-							"_attr": {
-								"id": row.path_hash,
-								"parent": row.album_hash,
-								"title": row.title,
-								"album": row.album,
-								"artist": row.artist,
-								"isDir": false,
-								"duration": row.duration,
-								"bitRate": row.bitrate,
-								"isVideo": false,
-								"path": path,
-								"albumId": row.album_hash,
-								"artistId": row.artist_hash,
-								"type": "music",
-								"coverArt": row.album_hash
+							_attr: {
+								id: row.path_hash,
+								parent: row.album_hash,
+								title: row.title,
+								album: row.album,
+								artist: row.artist,
+								isDir: false,
+								duration: row.duration,
+								bitRate: row.bitrate,
+								isVideo: false,
+								path: path,
+								albumId: row.album_hash,
+								artistId: row.artist_hash,
+								type: "music",
+								coverArt: row.album_hash
 							}
 						}
 					]
 				})
 			}, function() {
-				res.writeHead(200, {"Content-type": "text/xml"});
-				res.write(xml(obj));
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}				
+				reply(res, req, obj, callback);			
 			});
 		})
 	},
@@ -579,22 +556,10 @@ funcs = {
 	},
 
 	"/getRandomSongs": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"randomSongs": [
-					]
-				}
-			]
-		};
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			randomSongs: []
+		});
 
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
@@ -612,57 +577,38 @@ funcs = {
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 
 				list.push({
-					"song": [
+					song: [
 						{
-							"_attr": {
-								"id": row.path_hash,
-								"parent": row.album_hash,
-								"title": row.title,
-								"album": row.album,
-								"artist": row.artist,
-								"isDir": false,
-								"duration": row.duration,
-								"bitRate": row.bitrate,
-								"isVideo": false,
-								"path": path,
-								"albumId": row.album_hash,
-								"artistId": row.artist_hash,
-								"type": "music",
-								"coverArt": row.album_hash
+							_attr: {
+								id: row.path_hash,
+								parent: row.album_hash,
+								title: row.title,
+								album: row.album,
+								artist: row.artist,
+								isDir: false,
+								duration: row.duration,
+								bitRate: row.bitrate,
+								isVideo: false,
+								path: path,
+								albumId: row.album_hash,
+								artistId: row.artist_hash,
+								type: "music",
+								coverArt: row.album_hash
 							}
 						}
 					]
 				})
 			}, function() {
-				res.writeHead(200, {"Content-type": "text/xml"});
-				res.write(xml(obj));
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}				
+				reply(res, req, obj, callback);
 			});
 		})		
 	},
 
 	"/getAlbumList": function(req, res, callback) {
-		let obj = {
-			"subsonic-response": [
-				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "ok",
-						"version": "1.16.1"
-					}
-				},
-
-				{
-					"albumList": [
-					]
-				}
-			]
-		};
+		let obj = JSON.parse(JSON.stringify(defaultResponse));
+		obj["subsonic-response"].push({
+			albumList: []
+		});
 
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
@@ -679,57 +625,56 @@ funcs = {
 			offset = 0;
 		}
 
-		let type = "random";
+		let type = "alphabeticalByName";
 		if("type" in query) {
 			let allowedTypes = ["random", "newest", "alphabeticalByName"];
 			if(allowedTypes.indexOf(query.type) != -1) {
 				type = query.type;
+			} else {
+				reply(res, req, defaultResponse, callback);
+				return;
 			}
+		} else {
+			reply(res, req, defaultResponse, callback);
+			return;
 		}
 
-		let sql = ""
+		let order = ""
 		switch(type) {
 			case "newest":
-				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY mtime DESC LIMIT ? OFFSET ${offset}`;
+				order = `ORDER BY mtime DESC LIMIT ? OFFSET ${offset}`;
 				break;
 
 			case "random":
-				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY RANDOM() LIMIT ?`;
+				order = `ORDER BY RANDOM() LIMIT ?`;
 				break;
 
 			case "alphabeticalByName":
-				sql = `SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ORDER BY album ASC LIMIT ? OFFSET ${offset}`;
+				order = `ORDER BY album ASC LIMIT ? OFFSET ${offset}`;
 				break;
 		}
 
 		db.serialize(function() {
 			let list = obj["subsonic-response"][1]["albumList"];
 
-			db.each(sql, size, function(err, row) {
+			db.each(`SELECT DISTINCT album_hash, artist_hash, album, artist FROM music_fts ${order}`, size, function(err, row) {
 				list.push({
-					"album": [
+					album: [
 						{
-							"_attr": {
-								"id": row.album_hash,
-								"parent": row.artist_hash,
-								"title": row.album,
-								"album": row.album,
-								"artist": row.artist,
-								"isDir": true,
-								"coverArt": row.album_hash
+							_attr: {
+								id: row.album_hash,
+								parent: row.artist_hash,
+								title: row.album,
+								album: row.album,
+								artist: row.artist,
+								isDir: true,
+								coverArt: row.album_hash
 							}
 						}
 					]
 				})
 			}, function() {
-				res.writeHead(200, {"Content-type": "text/xml"});
-				res.write(xml(obj));
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}				
+				reply(res, req, obj, callback);			
 			});
 		})		
 	},
@@ -738,19 +683,19 @@ funcs = {
 		obj = {
 			"subsonic-response": [
 				{
-					"_attr": {
-						"xmlns": settings.restapi,
-						"status": "failed",
-						"version": "1.16.1"
+					_attr: {
+						xmlns: settings.restapi,
+						status: "failed",
+						version: "1.16.1"
 					}
 				},
 
 				{
-					"error": [
+					error: [
 						{
-							"_attr": {
-								"code": err.code,
-								"message": err.msg
+							_attr: {
+								code: err.code,
+								message: err.msg
 							}
 						}
 					]
@@ -758,14 +703,7 @@ funcs = {
 			]
 		}
 
-		res.writeHead(200, {"Content-type": "text/xml"});
-		res.write(xml(obj));
-
-		if(typeof callback == "function") {
-			callback(res);
-		} else {
-			res.end();
-		}
+		reply(res, req, obj, callback);
 	}
 }
 
@@ -775,7 +713,8 @@ let nullify = [
 	"/getBookmarks",
 	"/getGenres",
 	"/getStarred",
-	"/getMusicFolders"
+	"/getMusicFolders",
+	"/getPodcasts"
 ];
 for(idx in nullify) {
 	funcs[nullify[idx]] = funcs["/ping"];
