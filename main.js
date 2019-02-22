@@ -472,6 +472,32 @@ funcs = {
 							}
 						}
 					]
+				},
+
+				{
+					playlist: [
+						{
+							_attr: {
+								id: 2,
+								name: "Added Within 30 Days",
+								owner: "system",
+								public: true
+							}
+						}
+					]
+				},
+
+				{
+					playlist: [
+						{
+							_attr: {
+								id: 3,
+								name: "Added Within 90 Days",
+								owner: "system",
+								public: true
+							}
+						}
+					]
 				}
 			]
 		});
@@ -501,6 +527,8 @@ funcs = {
 		let sql = "";
 		switch(query.id) {
 			case "1":
+			case "2":
+			case "3":
 				sql = `SELECT * FROM music_fts`;
 				break;
 
@@ -514,6 +542,21 @@ funcs = {
 			let playlist = obj["subsonic-response"][1]["playlist"];
 
 			db.each(sql, function(err, row) {
+				if(query.id == 2 || query.id == 3) {
+					let mtime = parseInt(row.mtime);
+					
+					let minimum;
+					if(query.id == 2) {
+						minimum = Math.floor(Date.now()/1000) - 2592000;
+					} else if(query.id == 3) {
+						minimum = Math.floor(Date.now()/1000) - 7776000;
+					}
+
+					if(mtime < minimum) {
+						return;
+					}
+				}
+
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
 
 				playlist.push({
