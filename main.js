@@ -478,6 +478,19 @@ funcs = {
 					playlist: [
 						{
 							_attr: {
+								id: 4,
+								name: "Added Within 7 Days",
+								owner: "system",
+								public: true
+							}
+						}
+					]
+				},
+
+				{
+					playlist: [
+						{
+							_attr: {
 								id: 2,
 								name: "Added Within 30 Days",
 								owner: "system",
@@ -529,6 +542,7 @@ funcs = {
 			case "1":
 			case "2":
 			case "3":
+			case "4":
 				sql = `SELECT * FROM music_fts`;
 				break;
 
@@ -550,6 +564,8 @@ funcs = {
 						minimum = Math.floor(Date.now()/1000) - 2592000;
 					} else if(query.id == 3) {
 						minimum = Math.floor(Date.now()/1000) - 7776000;
+					} else if(query.id == 4) {
+						minimum = Math.floor(Date.now()/1000) - 604800;
 					}
 
 					if(mtime < minimum) {
