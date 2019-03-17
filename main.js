@@ -556,7 +556,7 @@ funcs = {
 			let playlist = obj["subsonic-response"][1]["playlist"];
 
 			db.each(sql, function(err, row) {
-				if(query.id == 2 || query.id == 3) {
+				if(query.id >= 2 || query.id <= 4) {
 					let mtime = parseInt(row.mtime);
 					
 					let minimum;
