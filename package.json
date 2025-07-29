@@ -1,17 +1,17 @@
 {
   "name": "dumbsonic",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Light API-only Subsonic server",
   "main": "main.js",
   "dependencies": {
-    "ffmpeg-static": "2.4.0",
-    "fluent-ffmpeg": "2.1.2",
-    "music-metadata": "3.2.4",
-    "sharp": "0.21.0",
-    "sqlite3": "4.0.4",
+    "ffmpeg-static": "latest",
+    "ffmpeg-stream": "^1.0.1",
+    "ffprobe-static": "^3.1.0",
+    "music-metadata": "latest",
+    "sharp": "latest",
+    "sqlite3": "latest",
     "xml": "1.0.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

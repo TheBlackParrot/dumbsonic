@@ -6,15 +6,17 @@ const url = require('url');
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3');
 const ffmpegStatic = require('ffmpeg-static');
-process.env['FFMPEG_PATH'] = ffmpegStatic.path;
-process.env['FFPROBE_PATH'] = ffmpegStatic.path.replace("ffmpeg", "ffprobe");
-const ffmpeg = require('fluent-ffmpeg');
+const ffprobeStatic = require('ffprobe-static');
+process.env['FFMPEG_PATH'] = ffmpegStatic;
+process.env['FFPROBE_PATH'] = ffprobeStatic.path;
+const ffmpeg = require("ffmpeg-stream");
 const sharp = require("sharp");
 sharp.cache(false);
 sharp.concurrency(1);
 const fs = require("fs");
+const ffmpegPath = require("ffmpeg-static");
 
-var db = new sqlite3.Database(settings.db);
+const db = new sqlite3.Database(settings.db);
 
 /*
 	SIDENOTE: I do **NOT** condone the use of MD5 being used as a cryptographic hash algorithm. Yell at the Subsonic developers to switch to a more robust hash algorithm.
@@ -34,19 +36,13 @@ const defaultResponse = {
 
 function tryAlbumArt(folder, res, at) {
 	let cover = `${folder}/${settings.art.files[at]}`;
-	//console.log(`trying ${cover}`);
 	
 	fs.access(cover, fs.constants.R_OK, function(err) {
 		if(!err) {
-			sharp(cover).resize(settings.art.size).jpeg({quality: 95}).toBuffer(function(err, data, info) {
+			sharp(cover).resize(settings.art.size).jpeg({quality: 90}).toBuffer(function(err, data) {
 				res.writeHead(200, {"Content-type": "image/jpeg"});
 				res.write(data);
-
-				if(typeof callback == "function") {
-					callback(res);
-				} else {
-					res.end();
-				}
+				res.end();
 			});
 		} else {
 			if(at >= settings.art.files.length - 1) {
@@ -57,41 +53,35 @@ function tryAlbumArt(folder, res, at) {
 						channels: 3,
 						background: {r: 64, g: 64, b: 64}
 					}
-				}).jpeg({quality: 95}).toBuffer(function(err, data, info) {
+				}).jpeg({quality: 95}).toBuffer(function(err, data) {
 					res.writeHead(200, {"Content-type": "image/jpeg"});
 					res.write(data);
-
-					if(typeof callback == "function") {
-						callback(res);
-					} else {
-						res.end();
-					}
+					res.end();
 				});
 			} else {
 				tryAlbumArt(folder, res, (at + 1))
 			}
 		}
-	})	
+	});	
 }
 
 function reply(res, req, obj, callback) {
-	let parsed = url.parse(req.url, true)
+	let parsed = url.parse(req.url, true);
 	let query = parsed.query;
-	let path = parsed.pathname;
 
 	let type = "xml";
 	if("f" in query) {
-		if(["xml", "json", "jsonp"].indexOf(query.f) != -1) {
+		if(["xml", "json", "jsonp"].indexOf(query.f) !== -1) {
 			type = query.f;
 		}
 	}
 
-	if(type == "json" || type == "jsonp") {
+	if(type === "json" || type === "jsonp") {
 		// support still WIP, need to get stuff out of _attr objects!
 		let newObj = {"subsonic-response": {}};
 
 		for(let idx in obj["subsonic-response"]) {
-			if(idx == 0) {
+			if(idx === 0) {
 				continue;
 			}
 
@@ -101,10 +91,6 @@ function reply(res, req, obj, callback) {
 			for(let idxx in keys) {
 				let key = keys[idxx];
 				newObj["subsonic-response"][key] = part[key];
-
-				/*if(Array.isArray(part[key])) {
-					console.log(`${key} is array`)
-				}*/
 			}
 		}
 
@@ -178,12 +164,13 @@ funcs = {
 			indexes: []
 		});
 
-		chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-		indexed = {};
+		// noinspection SpellCheckingInspection
+		const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		let indexed = {};
 		db.each("SELECT DISTINCT artist, artist_hash FROM music_fts", function(err, row) {
 			let addingTo = "#";
 			let char = row.artist[0].toUpperCase();
-			if(chars.indexOf(char) != -1) {
+			if(chars.indexOf(char) !== -1) {
 				addingTo = char;
 			}
 
@@ -197,10 +184,10 @@ funcs = {
 		}, function() {
 			let found = Object.keys(indexed).sort();
 			for(let idx in found) {
-				char = found[idx];
+				const char = found[idx];
 				let artists = indexed[char].sort();
 
-				toAdd = {
+				let toAdd = {
 					index: [
 						{
 							_attr: {
@@ -258,10 +245,8 @@ funcs = {
 	"/getMusicDirectory": function(req, res, callback) {
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
-		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		//console.log(query.id);
 
 		let obj = JSON.parse(JSON.stringify(defaultResponse));
 		obj["subsonic-response"].push({
@@ -273,7 +258,6 @@ funcs = {
 		});
 
 		let mainPart = obj["subsonic-response"][1]["directory"];
-		let children = [];
 
 		// 1: artist
 		// 2: album
@@ -323,7 +307,7 @@ funcs = {
 					};
 				}
 
-				if(seen.indexOf(row[children_wants + "_hash"]) != -1) {
+				if(seen.indexOf(row[children_wants + "_hash"]) !== -1) {
 					return;
 				} else {
 					seen.push(row[children_wants + "_hash"]);
@@ -333,7 +317,6 @@ funcs = {
 					case "1":
 						attrs = {
 							id: row["album_hash"],
-							album: row["album"],
 							name: row["album"],
 							title: row["album"],
 							isDir: true,
@@ -360,7 +343,7 @@ funcs = {
 							bitRate: row["bitrate"],
 							duration: row["duration"],
 							genre: row["genre"],
-							path: row["path"].substr(1),
+							path: row["path"].substring(1),
 							transcodedSuffix: settings.audio.container,
 							transcodedContentType: settings.audio.mimetype,
 							coverArt: row["album_hash"]
@@ -376,17 +359,13 @@ funcs = {
 					]
 				});
 			}, function() {
-				//console.log(children);
-				//console.log(mainPart);
-				//console.log(obj);
-
 				reply(res, req, obj, callback);
 			});
 		});
 	},
 
 	"/getArtistInfo": function(req, res, callback) {
-		out = `<subsonic-response xmlns="${settings.restapi}" status="ok" version="1.16.1">
+		const out = `<subsonic-response xmlns="${settings.restapi}" status="ok" version="1.16.1">
 			<artistInfo>
 				<biography>Unimplemented.</biography>
 			</artistInfo>
@@ -403,7 +382,7 @@ funcs = {
 	},
 
 	"/getUser": function(req, res, callback) {
-		out = `<user username="testuser" email="null@localhost" scrobblingEnabled="true" adminRole="false" settingsRole="true" downloadRole="true" playlistRole="true" coverArtRole="false" commentRole="false" podcastRole="false" streamRole="true" jukeboxRole="false" shareRole="false"/>`
+		const out = `<user username="testuser" email="null@localhost" scrobblingEnabled="true" adminRole="false" settingsRole="true" downloadRole="true" playlistRole="true" coverArtRole="false" commentRole="false" podcastRole="false" streamRole="true" jukeboxRole="false" shareRole="false"/>`
 
 		res.writeHead(200, {"Content-type": "text/xml"});
 		res.write(out);
@@ -418,41 +397,44 @@ funcs = {
 	"/stream": function(req, res, callback) {
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
-		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
-		//console.log(query.id);
 
 		db.serialize(function() {
-			db.get(`SELECT path FROM music_fts WHERE path_hash MATCH ?`, "\"" + query.id + "\"", function(err, row) {
+			db.get(`SELECT path FROM music_fts WHERE path_hash MATCH ?`, "\"" + query.id + "\"", async function(err, row) {
 				if(typeof row === "undefined") {
 					funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
 					return;
 				}
 
-				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
-				//console.log(path);
+				let path = settings.dirs.music + "/" + row.path.substring(1).replace(/\\/g, "/");
 
-				let ffCmd = new ffmpeg(path)
-					.audioCodec(settings.audio.codec)
-					.audioBitrate(settings.audio.bitrate)
-					.audioFrequency(settings.audio.rate)
-					.outputOptions(settings.audio.options)
-					.format(settings.audio.container)
-					.on('end', function() {
-						//console.log(`finished transcoding ${path}`);
-						if(typeof callback == "function") {
-							callback(res);
-						} else {
-							res.end();
-						}
-					});
-
-				res.writeHead(200, {"Content-type": settings.audio.mimetype});
-				let stream = ffCmd.pipe();
-				stream.on('data', function(chunk) {
-					res.write(chunk)
+				let ffmpegOptions = {
+					f: settings.audio.container,
+					acodec: settings.audio.codec,
+					ab: `${settings.audio.bitrate}k`,
+					ar: settings.audio.rate,
+					map: "0:a"
+				};
+				for(const opt in settings.audio.options) {
+					ffmpegOptions[opt] = settings.audio.options[opt];
+				}
+				
+				const converter = new ffmpeg.Converter(ffmpegPath);
+				converter.createInputFromFile(path);
+				
+				res.writeHead(200, {
+					"Content-type": settings.audio.mimetype
 				});
+				
+				converter.createOutputStream(ffmpegOptions).pipe(res);
+				await converter.run();
+
+				if(typeof callback == "function") {
+					callback(res);
+				} else {
+					res.end();
+				}
 			});
 		});
 	},
@@ -532,7 +514,6 @@ funcs = {
 
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
-		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
 		//console.log(query.id);
@@ -548,8 +529,7 @@ funcs = {
 
 			default:
 				funcs["error"](req, res, {code: 70, msg: "The requested data was not found."});
-				return;				
-				break;
+				return;
 		}
 
 		db.serialize(function() {
@@ -560,11 +540,11 @@ funcs = {
 					let mtime = parseInt(row.mtime);
 					
 					let minimum;
-					if(query.id == 2) {
+					if(query.id === "2") {
 						minimum = Math.floor(Date.now()/1000) - 2592000;
-					} else if(query.id == 3) {
+					} else if(query.id === "3") {
 						minimum = Math.floor(Date.now()/1000) - 7776000;
-					} else if(query.id == 4) {
+					} else if(query.id === "4") {
 						minimum = Math.floor(Date.now()/1000) - 604800;
 					}
 
@@ -573,7 +553,7 @@ funcs = {
 					}
 				}
 
-				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
+				let path = settings.dirs.music + "/" + row.path.substring(1).replace(/\\/g, "/");
 
 				playlist.push({
 					entry: [
@@ -606,7 +586,6 @@ funcs = {
 	"/getCoverArt": function(req, res, callback) {
 		let parsed = url.parse(req.url, true)
 		let query = parsed.query;
-		let path = parsed.pathname;
 
 		query.id = query.id.replace(/[^a-f0-9]/gi, "");
 		//console.log(query.id);
@@ -624,7 +603,6 @@ funcs = {
 			default:
 				funcs["error"](req, res, {code: 0, msg: "Unimplemented."});
 				return;
-				break;
 		}
 
 		db.serialize(function() {
@@ -635,7 +613,7 @@ funcs = {
 				}
 
 				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
-				let folder = path.substr(0, path.lastIndexOf("/"));
+				let folder = path.substring(0, path.lastIndexOf("/"));
 
 				tryAlbumArt(folder, res, 0)
 			})
@@ -661,7 +639,7 @@ funcs = {
 			let list = obj["subsonic-response"][1]["randomSongs"];
 
 			db.each(`SELECT * FROM music_fts ORDER BY RANDOM() LIMIT ?`, size, function(err, row) {
-				let path = settings.dirs.music + "/" + row.path.substr(1).replace(/\\/g, "/");
+				let path = settings.dirs.music + "/" + row.path.substring(1).replace(/\\/g, "/");
 
 				list.push({
 					song: [
@@ -715,7 +693,7 @@ funcs = {
 		let type = "alphabeticalByName";
 		if("type" in query) {
 			let allowedTypes = ["random", "newest", "alphabeticalByName"];
-			if(allowedTypes.indexOf(query.type) != -1) {
+			if(allowedTypes.indexOf(query.type) !== -1) {
 				type = query.type;
 			} else {
 				reply(res, req, defaultResponse, callback);
@@ -822,11 +800,9 @@ var endReq = function(res) {
 }
 
 http.createServer(function(req, res) {
-	//console.log(req);
 	let parsed = url.parse(req.url, true)
 	let query = parsed.query;
 	let path = parsed.pathname;
-	//console.log("\n\n");
 
 	if(!(path in funcs)) {
 		res.writeHead(404);
@@ -852,44 +828,27 @@ http.createServer(function(req, res) {
 	let callback = endReq;
 
 	if(!(query.u in settings.login)) {
-		//console.log("invalid username");
-
 		funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
-		return;
 	} else {
-		//console.log("valid username");
-
 		if("p" in query) {
 			let hex = Buffer.from(settings.login[query.u], 'utf8').toString('hex');
 
-			if(query.p != "enc:" + hex) {
-				//console.log("invalid password");
-
+			if(query.p !== "enc:" + hex) {
 				funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
-				return;
 			} else {
-				//console.log(`valid password, trying ${path}`);
-
 				if(path in funcs) {
 					funcs[path](req, res, callback);
-					return;
 				}			
 			}
 		} else if("t" in query && "s" in query) {
 			let correctHash = crypto.createHash("md5").update(settings.login[query.u] + query.s).digest("hex");
 
-			if(query.t == correctHash) {
-				//console.log(`valid token, trying ${path}`);
-
+			if(query.t === correctHash) {
 				if(path in funcs) {
 					funcs[path](req, res, callback);
-					return;
 				}				
 			} else {
-				//console.log("invalid token");
-
 				funcs["error"](req, res, {code: 40, msg: "Wrong username or password."}, callback);
-				return;
 			}
 		}
 	}

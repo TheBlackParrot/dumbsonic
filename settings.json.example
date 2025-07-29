@@ -19,11 +19,10 @@
 		"rate": "48000",
 		"codec": "libopus",
 		"container": "ogg",
-		"options": [
-			"-vn",
-			"-compression_level 10",
-			"-frame_duration 60"
-		],
+		"options": {
+            "compression_level": 10,
+            "frame_duration": 60
+        },
 		"mimetype": "application/ogg"
 	},
 
